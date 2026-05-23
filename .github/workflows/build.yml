@@ -1,0 +1,153 @@
+name: Build Kindle OCR
+
+# 手動実行 + main push + タグ作成時に走る
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+
+jobs:
+  # ===========================================================
+  # Mac 版ビルド
+  # ===========================================================
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system deps (Homebrew)
+        run: |
+          brew install tesseract tesseract-lang ghostscript unpaper poppler
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Generate icon
+        run: |
+          python scripts/generate_icon.py
+          iconutil -c icns icon_build/AppIcon.iconset -o icon_build/AppIcon.icns
+
+      - name: Build .app with PyInstaller
+        run: |
+          pyinstaller KindleOCR.spec --clean --noconfirm
+          xattr -cr "dist/Kindle OCR.app" || true
+
+      - name: Ad-hoc code sign
+        run: |
+          codesign --force --deep --sign - "dist/Kindle OCR.app"
+
+      - name: Create distribution ZIP
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent "Kindle OCR.app" "KindleOCR-Mac.zip"
+
+      - name: Upload Mac artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KindleOCR-Mac
+          path: dist/KindleOCR-Mac.zip
+
+  # ===========================================================
+  # Windows 版ビルド
+  # ===========================================================
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install tesseract (Chocolatey)
+        run: |
+          choco install tesseract --params '"/DownloadAdditionalData"' -y --no-progress
+        shell: powershell
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+        shell: powershell
+
+      - name: Install Yomitoku (optional Japanese OCR)
+        run: |
+          # PyTorch CPU版を先に入れて軽量化（CIランナーの容量節約）
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install yomitoku
+        continue-on-error: true
+        shell: powershell
+
+      - name: Build .exe with PyInstaller
+        run: |
+          pyinstaller KindleOCR.spec --clean --noconfirm
+        shell: powershell
+
+      - name: Create distribution ZIP
+        run: |
+          Compress-Archive -Path 'dist\Kindle OCR' -DestinationPath 'dist\KindleOCR-Windows.zip' -Force
+        shell: powershell
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KindleOCR-Windows
+          path: dist/KindleOCR-Windows.zip
+
+  # ===========================================================
+  # Release（タグpushされた時だけ）
+  # ===========================================================
+  release:
+    needs: [build-mac, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Mac artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: KindleOCR-Mac
+          path: ./dist
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: KindleOCR-Windows
+          path: ./dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/KindleOCR-Mac.zip
+            dist/KindleOCR-Windows.zip
+          body: |
+            ## Kindle OCR App ${{ github.ref_name }}
+
+            ### ダウンロード
+            - **Mac の方**: `KindleOCR-Mac.zip` をダウンロード
+            - **Windows の方**: `KindleOCR-Windows.zip` をダウンロード
+
+            ### インストール
+            解凍してアプリをダブルクリックで起動。
+
+            #### Mac
+            初回起動時:
+            - 「開発元が未確認」警告 → 右クリック→開く→開く
+            - アクセシビリティ・画面収録 許可
+
+            #### Windows
+            - SmartScreen警告 → 詳細情報→実行
+            - ウイルス対策ソフトが遮断する場合は除外設定

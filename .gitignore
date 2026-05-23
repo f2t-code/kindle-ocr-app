@@ -1,0 +1,37 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Release artifacts
+release/
+release_mac/
+KindleOCR-Mac.zip
+KindleOCR-Windows.zip
+
+# Mac
+.DS_Store
+*.icns
+icon_build/
+Kindle OCR.app/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+
+# Local secrets
+.env
+*.local.json
