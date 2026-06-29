@@ -23,6 +23,7 @@ ENGINE_APPLE_VISION = 'apple_vision'
 ENGINE_TESSERACT = 'tesseract'
 ENGINE_GOOGLE_VISION = 'google_vision'
 ENGINE_YOMITOKU = 'yomitoku'
+ENGINE_MLX_QWEN = 'mlx_qwen'
 
 
 def get_default_engine() -> str:
@@ -62,6 +63,14 @@ def list_available_engines() -> list[tuple[str, str]]:
     from src.ocr_yomitoku import is_available as yomi_available
     if yomi_available():
       engines.append((ENGINE_YOMITOKU, 'Yomitoku（日本語特化・無料）'))
+  except ImportError:
+    pass
+
+  # mlx-vlm (Qwen2.5-VL) は Apple Silicon かつ mlx-vlm 導入時のみ候補
+  try:
+    from src.ocr_mlx_qwen import is_available as mlx_available
+    if mlx_available():
+      engines.append((ENGINE_MLX_QWEN, 'Qwen2.5-VL（ローカルAI・高精度・要DL）'))
   except ImportError:
     pass
 
@@ -179,6 +188,10 @@ def run_ocr_from_images(
   if engine == ENGINE_YOMITOKU:
     from src.ocr_yomitoku import build_searchable_pdf_from_images as y_build
     return y_build(images, output_pdf, None, progress)
+
+  if engine == ENGINE_MLX_QWEN:
+    from src.ocr_mlx_qwen import build_searchable_pdf_from_images as q_build
+    return q_build(images, output_pdf, None, progress)
 
   # Tesseract フォールバック: img2pdf → ocrmypdf
   from src.pdf_builder import build_pdf

@@ -1,0 +1,12 @@
+# Qwen2.5-VL（mlx-vlm）ローカルOCR用の任意追加依存（Apple Silicon Mac 専用）
+#
+# このファイルは base の requirements.txt には含めない（約1GB＋モデル数GBと重いため）。
+# Qwen エンジンを使いたい場合のみ、Apple Silicon Mac で以下を実行:
+#
+#   venv/bin/pip install -r requirements-mlx.txt
+#
+# 初回OCR実行時に Hugging Face からモデル（既定 3B-4bit, 約2GB）を自動DLする。
+# より高精度が必要なら環境変数で 7B に切替:
+#   export KINDLE_OCR_MLX_MODEL=mlx-community/Qwen2.5-VL-7B-Instruct-4bit
+
+mlx-vlm>=0.6.3; sys_platform == 'darwin' and platform_machine == 'arm64'
